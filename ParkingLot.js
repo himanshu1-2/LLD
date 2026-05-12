@@ -1,211 +1,121 @@
-const VehicleStatus = {
-    AVAILABLE: "available",
-    BOOKED: "booked",
-    IN_SERVICE: "in_service"
-};
-
-const ReservationStatus = {
-    SCHEDULED: "scheduled",
-    CANCELLED: "cancelled",
-    COMPLETED: "completed",
-    IN_PROGRESS: "in_progress"
-};
-
+// --- 1. VEHICLE FACTORY PATTERN ---
 class Vehicle {
-    constructor(id, plate, model, hourlyRate) {
-        this.id = id;
-        this.plate = plate;
-        this.model = model;
-        this.hourlyRate = hourlyRate;
-        this.status = VehicleStatus.AVAILABLE;
-    }
+  constructor(licensePlate, type) {
+    this.licensePlate = licensePlate;
+    this.type = type; // 'CAR', 'BIKE', 'TRUCK'
+  }
 }
 
-class User {
-    constructor(id, name, email) {
-        this.id = id;
-        this.name = name;
-        this.email = email;
-    }
+class Car extends Vehicle { constructor(plate) { super(plate, 'CAR'); } }
+class Bike extends Vehicle { constructor(plate) { super(plate, 'BIKE'); } }
+
+class VehicleFactory {
+  static createVehicle(type, plate) {
+    const types = { 'CAR': Car, 'BIKE': Bike };
+    const VehicleClass = types[type.toUpperCase()];
+    if (!VehicleClass) throw new Error("Vehicle type not supported");
+    return new VehicleClass(plate);
+  }
 }
 
-class Store {
-    constructor(id, city) {
-        this.id = id;
-        this.city = city;
-        this.vehicles = [];
-    }
-
-    addVehicle(vehicle) {
-        this.vehicles.push(vehicle);
-    }
-
-    getAvailableVehicles() {
-        return this.vehicles.filter(
-            vehicle => vehicle.status === VehicleStatus.AVAILABLE
-        );
-    }
+// --- 2. PRICING STRATEGY PATTERN ---
+class HourlyStrategy {
+  calculate(duration) { return Math.ceil(duration) * 20; }
 }
 
-class Reservation {
-    constructor(user, vehicle, startTime, endTime) {
-        this.id = `RES-${Math.floor(Math.random() * 10000)}`;
-        this.user = user;
-        this.vehicle = vehicle;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.status = ReservationStatus.SCHEDULED;
-    }
-
-    calculateBill(start, end) {
-        const hours = (end - start) / (1000 * 60 * 60);
-
-        console.log(
-            `Hours: ${hours}, Hourly Rate: ${this.vehicle.hourlyRate}`
-        );
-
-        return hours * this.vehicle.hourlyRate;
-    }
-
-    startTrip() {
-        if (this.status === ReservationStatus.SCHEDULED) {
-            this.status = ReservationStatus.IN_PROGRESS;
-            console.log("Trip started");
-        } else {
-            console.log("Trip cannot be started.");
-        }
-    }
-
-    completeTrip() {
-        if (this.status === ReservationStatus.IN_PROGRESS) {
-            this.status = ReservationStatus.COMPLETED;
-
-            this.actualEndTime = new Date();
-
-            this.vehicle.status = VehicleStatus.AVAILABLE;
-
-            this.finalBill = this.calculateBill(
-                this.startTime,
-                this.actualEndTime
-            );
-
-            console.log(`Trip completed. Final bill: $${this.finalBill}`);
-        }
-    }
+class FlatStrategy {
+  calculate() { return 50; }
 }
 
-class ZoomCarService {
-    constructor() {
-        this.reservations = [];
-        this.stores = [];
-    }
-
-    addStore(store) {
-        this.stores.push(store);
-    }
-
-    getVehiclesInLocation(city) {
-        const store = this.stores.find(s => s.city === city);
-
-        return store ? store.getAvailableVehicles() : [];
-    }
-
-    createBooking(user, city, vehicle, startTime, endTime) {
-        const store = this.stores.find(s => s.city === city);
-
-        if (!store) {
-            throw new Error("Location not found");
-        }
-
-        if (vehicle.status !== VehicleStatus.AVAILABLE) {
-            console.log("Vehicle is not available for booking.");
-            return null;
-        }
-
-        const reservation = new Reservation(
-            user,
-            vehicle,
-            startTime,
-            endTime
-        );
-
-        vehicle.status = VehicleStatus.BOOKED;
-
-        this.reservations.push(reservation);
-
-        console.log(
-            `Booking created successfully with ID: ${reservation.id}`
-        );
-
-        return reservation;
-    }
+// --- 3. CORE ENTITIES ---
+class ParkingSpot {
+  constructor(id, type) {
+    this.id = id;
+    this.type = type;
+    this.vehicle = null;
+  }
+  isAvailable() { return this.vehicle === null; }
+  assign(vehicle) { this.vehicle = vehicle; }
+  remove() { this.vehicle = null; }
 }
 
-/* -------------------- TESTING -------------------- */
+class ParkingFloor {
+  constructor(floorNumber, spotsData) {
+    this.floorNumber = floorNumber;
+    this.spots = spotsData.map(s => new ParkingSpot(s.id, s.type));
+  }
 
-const app = new ZoomCarService();
-
-const store = new Store(1, "Delhi");
-
-const car = new Vehicle(
-    "CAR-001",
-    "DL-1234",
-    "Toyota Camry",
-    10
-);
-
-const car1 = new Vehicle(
-    "CAR-002",
-    "DL-5678",
-    "Honda City",
-    15
-);
-
-store.addVehicle(car);
-store.addVehicle(car1);
-
-app.addStore(store);
-
-const user = new User(101, "Amit", "amit@gmail.com");
-
-const scheduledEnd = new Date(Date.now() + 2 * 60 * 60 * 1000);
-
-const myBooking = app.createBooking(
-    user,
-    "Delhi",
-    car,
-    new Date(),
-    scheduledEnd
-);
-
-if (myBooking) {
-    myBooking.startTrip();
-
-    setTimeout(() => {
-        myBooking.completeTrip();
-    }, 2000);
+  findSpot(vehicleType) {
+    return this.spots.find(spot => spot.isAvailable() && spot.type === vehicleType);
+  }
 }
 
-/* ---------------- PREFIX SUM ---------------- */
+// --- 4. SINGLETON PARKING LOT ---
+class ParkingLot {
+  constructor(name) {
+    if (ParkingLot.instance) return ParkingLot.instance;
+    this.name = name;
+    this.floors = [];
+    this.activeTickets = new Map();
+    this.pricingStrategy = new HourlyStrategy(); 
+    ParkingLot.instance = this;
+  }
 
-const prefixSum = (arr, k) => {
-    let currentSum = 0;
-    let count = 0;
+  addFloor(floor) { this.floors.push(floor); }
 
-    const map = {};
-    map[0] = 1;
+  setPricingStrategy(strategy) { this.pricingStrategy = strategy; }
 
-    for (let i = 0; i < arr.length; i++) {
-        currentSum += arr[i];
-
-        if ((currentSum - k) in map) {
-            count += map[currentSum - k];
-        }
-
-        map[currentSum] = (map[currentSum] || 0) + 1;
+  park(vehicleType, plate) {
+    const vehicle = VehicleFactory.createVehicle(vehicleType, plate);
+    
+    for (const floor of this.floors) {
+      const spot = floor.findSpot(vehicle.type);
+      if (spot) {
+        spot.assign(vehicle);
+        const ticket = {
+          id: `TKT-${Date.now()}`,
+          vehicle,
+          spot,
+          entryTime: new Date(Date.now() - 3600000 * 2) // Simulating 2 hours ago
+        };
+        this.activeTickets.set(ticket.id, ticket);
+        return ticket;
+      }
     }
+    return "No spots available";
+  }
 
-    return count;
-};
+  exit(ticketId) {
+    const ticket = this.activeTickets.get(ticketId);
+    if (!ticket) return "Invalid Ticket";
 
-console.log(prefixSum([1, 1, 1], 2)); // 2
+    const duration = (new Date() - ticket.entryTime) / 3600000;
+    const amount = this.pricingStrategy.calculate(duration);
+    
+    ticket.spot.remove();
+    this.activeTickets.delete(ticketId);
+
+    return { plate: ticket.vehicle.licensePlate, fee: amount, duration: duration.toFixed(2) };
+  }
+}
+
+// --- 5. EXECUTION ---
+const myParking = new ParkingLot("Central Mall");
+
+// Setup: 1 floor with 1 Car spot and 1 Bike spot
+myParking.addFloor(new ParkingFloor(1, [
+  { id: '1A', type: 'CAR' },
+  { id: '1B', type: 'BIKE' }
+]));
+
+// Scenario: Car enters
+const myTicket = myParking.park("CAR", "ABC-123");
+console.log("Vehicle Parked:", myTicket.id);
+
+// Scenario: Car exits with Hourly Strategy
+console.log("Exit Receipt (Hourly):", myParking.exit(myTicket.id));
+
+// Scenario: Switch to Flat Rate for a new car
+myParking.setPricingStrategy(new FlatStrategy());
+const holidayTicket = myParking.park("CAR", "HOLIDAY-1");
+console.log("Exit Receipt (Flat):", myParking.exit(holidayTicket.id));

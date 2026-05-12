@@ -110,19 +110,13 @@ class ZoomCarService {
         return store ? store.getAvailableVehicles() : [];
     }
 
-    createBooking(user, city, vehicleId, startTime, endTime) {
+    createBooking(user, city, vehicle, startTime, endTime) {
         const store = this.stores.find(s => s.city === city);
 
         if (!store) {
             throw new Error("Location not found");
         }
-         const vehicle = store.vehicles.find(
-        v => v.id === vehicleId
-    );
 
-    if (!vehicle) {
-        throw new Error("Vehicle not found in store");
-    }
         if (vehicle.status !== VehicleStatus.AVAILABLE) {
             console.log("Vehicle is not available for booking.");
             return null;
@@ -179,7 +173,7 @@ const scheduledEnd = new Date(Date.now() + 2 * 60 * 60 * 1000);
 const myBooking = app.createBooking(
     user,
     "Delhi",
-    'CAR-001',
+    car,
     new Date(),
     scheduledEnd
 );
