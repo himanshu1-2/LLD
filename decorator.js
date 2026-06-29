@@ -24,7 +24,7 @@ class CouponDecorator extends Product{
 }
 class TenPercentOffCoupon extends CouponDecorator{
     getDescription(){
-        return rhis.product.getDescription()+"10% off coupon";
+        return this.product.getDescription()+"10% off coupon";
     }
     getPrice(){
         return this.product.getPrice()*0.5;
